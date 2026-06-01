@@ -1,45 +1,45 @@
 possivel alteração para o codigo
 
-import os
-import re
-import sys
-import tkinter as tk
-from tkinter import messagebox
-
-import pandas as pd
+    import os
+    import re
+    import sys
+    import tkinter as tk
+    from tkinter import messagebox
+    
+    import pandas as pd
 
 # =========================
 # 1. CONFIGURAÇÕES INICIAIS
 # =========================
-SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
-if getattr(sys, "frozen", False):
-    BASE_DIR = os.path.dirname(sys.executable)
-else:
-    BASE_DIR = os.getcwd()
+    SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
+    if getattr(sys, "frozen", False):
+        BASE_DIR = os.path.dirname(sys.executable)
+    else:
+        BASE_DIR = os.getcwd()
 
 # Lista de postos militares compatível com o seu Bloco de Notas
-POSTOS = [
-    "Soldado", "Sd",
-    "Cabo", "Cb",
-    "3º Sgt", "2º Sgt", "1º Sgt", "Sgt",
-    "Sub Ten", "Subtenente",
-    "2º Ten", "1º Ten", "Ten",
-    "Cap", "Capitão",
-    "Maj", "Major",
-    "Ten Cel", "TCel",
-    "Cel", "Coronel",
-    "Gen"
-]
+    POSTOS = [
+        "Soldado", "Sd",
+        "Cabo", "Cb",
+        "3º Sgt", "2º Sgt", "1º Sgt", "Sgt",
+        "Sub Ten", "Subtenente",
+        "2º Ten", "1º Ten", "Ten",
+        "Cap", "Capitão",
+        "Maj", "Major",
+        "Ten Cel", "TCel",
+        "Cel", "Coronel",
+        "Gen"
+    ]
 
 
 # =========================
 # 2. FUNÇÕES DE PROCESSAMENTO
 # =========================
 
-def localizar_txt(txt_file):
-    """Retorna o caminho completo do TXT."""
-    if os.path.isabs(txt_file) and os.path.isfile(txt_file):
-        return txt_file
+    def localizar_txt(txt_file):
+        """Retorna o caminho completo do TXT."""
+        if os.path.isabs(txt_file) and os.path.isfile(txt_file):
+            return txt_file
 
     possiveis = [
         os.path.join(BASE_DIR, txt_file),
@@ -52,25 +52,25 @@ def localizar_txt(txt_file):
     return None
 
 
-def encontrar_txts():
-    """Retorna a lista de arquivos TXT na pasta."""
-    encontrados = []
-    for pasta in [BASE_DIR, SCRIPT_DIR]:
-        if not os.path.isdir(pasta):
-            continue
-        for nome in sorted(os.listdir(pasta)):
-            if nome.lower().endswith(".txt"):
-                caminho = os.path.join(pasta, nome)
-                if os.path.isfile(caminho) and caminho not in encontrados:
-                    encontrados.append(caminho)
-    return encontrados
+    def encontrar_txts():
+        """Retorna a lista de arquivos TXT na pasta."""
+        encontrados = []
+        for pasta in [BASE_DIR, SCRIPT_DIR]:
+            if not os.path.isdir(pasta):
+                continue
+            for nome in sorted(os.listdir(pasta)):
+                if nome.lower().endswith(".txt"):
+                    caminho = os.path.join(pasta, nome)
+                    if os.path.isfile(caminho) and caminho not in encontrados:
+                        encontrados.append(caminho)
+        return encontrados
 
 
-def ler_texto_arquivo(txt_file):
-    """Abre o arquivo TXT tratando codificações comuns do Windows."""
-    caminho = localizar_txt(txt_file)
-    if caminho is None:
-        raise FileNotFoundError(f"Arquivo TXT não encontrado: {txt_file}")
+    def ler_texto_arquivo(txt_file):
+        """Abre o arquivo TXT tratando codificações comuns do Windows."""
+        caminho = localizar_txt(txt_file)
+        if caminho is None:
+            raise FileNotFoundError(f"Arquivo TXT não encontrado: {txt_file}")
 
     try:
         with open(caminho, 'r', encoding='utf-8') as f:
@@ -82,12 +82,12 @@ def ler_texto_arquivo(txt_file):
     return texto or ""
 
 
-def processar_linhas_txt(texto):
-    """Varre o texto linha por linha isolando Posto e Nome com base no seu exemplo."""
-    # Ordena os postos por tamanho decrescente para evitar que 'Ten' morda 'Ten Cel'
-    postos_ordenados = sorted(POSTOS, key=len, reverse=True)
-    regex_postos = "|".join(re.escape(p) for p in postos_ordenados)
-    
+    def processar_linhas_txt(texto):
+        """Varre o texto linha por linha isolando Posto e Nome com base no seu exemplo."""
+        # Ordena os postos por tamanho decrescente para evitar que 'Ten' morda 'Ten Cel'
+        postos_ordenados = sorted(POSTOS, key=len, reverse=True)
+        regex_postos = "|".join(re.escape(p) for p in postos_ordenados)
+        
     # Captura o posto no início da linha e todo o resto como nome
     padrao = rf"^({regex_postos})\b\s*(.*)"
 
@@ -123,27 +123,27 @@ def processar_linhas_txt(texto):
     return dados if dados else None
 
 
-def salvar_excel(dados, nome_arquivo):
-    """Cria o arquivo Excel final."""
-    df = pd.DataFrame(dados)
-    caminho_saida = os.path.join(BASE_DIR, nome_arquivo)
-    if os.path.exists(caminho_saida):
-        try:
-            os.remove(caminho_saida)
-        except PermissionError:
-            raise PermissionError(
-                f"Feche o arquivo existente antes de continuar: {caminho_saida}"
-            )
-    df.to_excel(caminho_saida, index=False, engine="openpyxl")
-    return caminho_saida
+    def salvar_excel(dados, nome_arquivo):
+        """Cria o arquivo Excel final."""
+        df = pd.DataFrame(dados)
+        caminho_saida = os.path.join(BASE_DIR, nome_arquivo)
+        if os.path.exists(caminho_saida):
+            try:
+                os.remove(caminho_saida)
+            except PermissionError:
+                raise PermissionError(
+                    f"Feche o arquivo existente antes de continuar: {caminho_saida}"
+                )
+        df.to_excel(caminho_saida, index=False, engine="openpyxl")
+        return caminho_saida
 
 
 # =========================
 # 3. INTERFACE GRÁFICA (GUI)
 # =========================
 
-def gerar_excel():
-    txt_selecionado = txt_var.get()
+    def gerar_excel():
+        txt_selecionado = txt_var.get()
 
     if not txt_selecionado:
         messagebox.showwarning("Aviso", "Nenhum arquivo .txt encontrado.")
@@ -168,10 +168,10 @@ def gerar_excel():
         messagebox.showerror("Erro", str(error))
 
 
-def criar_gui():
-    global txt_var, txt_map
-    txts = encontrar_txts()
-    txt_map = {os.path.basename(caminho): caminho for caminho in txts}
+    def criar_gui():
+        global txt_var, txt_map
+        txts = encontrar_txts()
+        txt_map = {os.path.basename(caminho): caminho for caminho in txts}
 
     root = tk.Tk()
     root.title("Conversor TXT para Excel")
@@ -199,5 +199,5 @@ def criar_gui():
     root.mainloop()
 
 
-if __name__ == "__main__":
-    criar_gui()
+    if __name__ == "__main__":
+        criar_gui()
