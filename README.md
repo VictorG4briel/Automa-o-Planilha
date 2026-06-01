@@ -4,50 +4,51 @@ mudar de pdf pra bloco de notas Ou tentar modificar intervalo do codigo do quart
 
 Possivel alteração que posso realizar 
 
-import os
-import re
-import sys
-import tkinter as tk
-from tkinter import messagebox
-
-import pandas as pd
+    import os
+    import re
+    import sys
+    import tkinter as tk
+    from tkinter import messagebox
+    
+    import pandas as pd
 
 # =========================
 # 1. CONFIGURAÇÕES INICIAIS
 # =========================
-SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
-if getattr(sys, "frozen", False):
-    BASE_DIR = os.path.dirname(sys.executable)
-else:
-    BASE_DIR = os.getcwd()
+    SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
+    if getattr(sys, "frozen", False):
+        BASE_DIR = os.path.dirname(sys.executable)
+    else:
+        BASE_DIR = os.getcwd()
 
 # Lista de postos militares usada para identificar nomes no TXT
-POSTOS = [
-    "Soldado", "Sd",
-    "Cabo", "Cb",
-    "3º Sgt", "2º Sgt", "1º Sgt", "Sgt",
-    "Sub Ten", "Subtenente",
-    "2º Ten", "1º Ten", "Ten",
-    "Cap", "Capitão",
-    "Maj", "Major",
-    "Ten Cel", "TCel",
-    "Cel", "Coronel",
-    "Gen"
-]
+    POSTOS = [
+        "Soldado", "Sd",
+        "Cabo", "Cb",
+        "3º Sgt", "2º Sgt", "1º Sgt", "Sgt",
+        "Sub Ten", "Subtenente",
+        "2º Ten", "1º Ten", "Ten",
+        "Cap", "Capitão",
+        "Maj", "Major",
+        "Ten Cel", "TCel",
+        "Cel", "Coronel",
+        "Gen"
+    ]
 
 # Padrão regex para localizar o trecho entre "4)" e "5)"
-TXT_PATTERN = r"4\).*?(?=5\))"
+    TXT_PATTERN = r"4\).*?(?=5\))"
 
 
 # =========================
 # 2. FUNÇÕES DE PROCESSAMENTO
 # =========================
 
-def localizar_txt(txt_file):
+
+    def localizar_txt(txt_file):
     """Retorna o caminho completo do TXT, considerando pasta atual, pasta do script e caminho absoluto."""
     if os.path.isabs(txt_file) and os.path.isfile(txt_file):
         return txt_file
-
+        
     possiveis = [
         os.path.join(BASE_DIR, txt_file),
         os.path.join(SCRIPT_DIR, txt_file),
@@ -60,7 +61,7 @@ def localizar_txt(txt_file):
     return None
 
 
-def encontrar_txts():
+    def encontrar_txts():
     """Retorna a lista de arquivos TXT (Bloco de Notas) na pasta atual e na pasta do script."""
     encontrados = []
     for pasta in [BASE_DIR, SCRIPT_DIR]:
@@ -74,7 +75,7 @@ def encontrar_txts():
     return encontrados
 
 
-def ler_texto_arquivo(txt_file):
+    def ler_texto_arquivo(txt_file):
     """Abre o arquivo TXT e extrai todo o seu conteúdo de texto."""
     caminho = localizar_txt(txt_file)
     if caminho is None:
@@ -91,7 +92,7 @@ def ler_texto_arquivo(txt_file):
     return texto or ""
 
 
-def extrair_data_e_cidade(texto):
+    def extrair_data_e_cidade(texto):
     """Extrai a data de regresso, hora e cidade do bloco do texto."""
     bloco = re.search(TXT_PATTERN, texto, re.DOTALL)
     trecho = bloco.group(0) if bloco else texto
@@ -134,7 +135,7 @@ def extrair_data_e_cidade(texto):
     return data_regresso, hora_regresso, cidade
 
 
-def extrair_nomes(texto):
+    def extrair_nomes(texto):
     """Localiza o trecho entre 4) e 5) e extrai Posto + Nome com regex."""
     bloco = re.search(TXT_PATTERN, texto, re.DOTALL)
     if not bloco:
@@ -166,7 +167,7 @@ def extrair_nomes(texto):
     return dados
 
 
-def salvar_excel(dados, nome_arquivo):
+    def salvar_excel(dados, nome_arquivo):
     """Cria um arquivo Excel a partir dos dados extraídos."""
     df = pd.DataFrame(dados)
     caminho_saida = os.path.join(BASE_DIR, nome_arquivo)
@@ -185,7 +186,7 @@ def salvar_excel(dados, nome_arquivo):
 # 3. MODO INTERATIVO COM GUI
 # =========================
 
-def gerar_excel():
+    def gerar_excel():
     """Lê o arquivo TXT e gera o arquivo Excel quando o botão for clicado."""
     txt_selecionado = txt_var.get()
 
@@ -213,7 +214,7 @@ def gerar_excel():
         messagebox.showerror("Erro", str(error))
 
 
-def criar_gui():
+    def criar_gui():
     """Cria a interface gráfica para escolher o arquivo TXT."""
     global txt_var, txt_map
     txts = encontrar_txts()
@@ -245,5 +246,5 @@ def criar_gui():
     root.mainloop()
 
 
-if __name__ == "__main__":
+    if __name__ == "__main__":
     criar_gui()
