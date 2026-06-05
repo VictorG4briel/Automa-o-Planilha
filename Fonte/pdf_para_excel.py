@@ -5,7 +5,6 @@ import tkinter as tk
 from tkinter import messagebox
 
 import pandas as pd
-import pdfplumber
 
 # =========================
 # 1. CONFIGURAÇÕES INICIAIS
@@ -17,7 +16,7 @@ if getattr(sys, "frozen", False):
 else:
     BASE_DIR = os.getcwd()
 
-# Lista de postos militares usada para identificar nomes no PDF
+# Lista de postos militares usada para identificar nomes no arquivo de texto
 POSTOS = [
     "Soldado", "Sd",
     "Cabo", "Cb",
@@ -31,22 +30,18 @@ POSTOS = [
     "Gen"
 ]
 
-# Padrão regex para localizar o trecho entre "4)" e "5)"
-PDF_PATTERN = r"4\).*?(?=5\))"
-
-
 # =========================
 # 2. FUNÇÕES DE PROCESSAMENTO
 # =========================
 
-def localizar_pdf(pdf_file):
-    """Retorna o caminho completo do PDF, considerando pasta atual, pasta do script e caminho absoluto."""
-    if os.path.isabs(pdf_file) and os.path.isfile(pdf_file):
-        return pdf_file
+def localizar_txt(txt_file):
+    """Retorna o caminho completo do arquivo TXT, considerando pasta atual, pasta do script e caminho absoluto."""
+    if os.path.isabs(txt_file) and os.path.isfile(txt_file):
+        return txt_file
 
     possiveis = [
-        os.path.join(BASE_DIR, pdf_file),
-        os.path.join(SCRIPT_DIR, pdf_file),
+        os.path.join(BASE_DIR, txt_file),
+        os.path.join(SCRIPT_DIR, txt_file),
     ]
 
     for caminho in possiveis:
@@ -56,39 +51,42 @@ def localizar_pdf(pdf_file):
     return None
 
 
-def encontrar_pdfs():
-    """Retorna a lista de arquivos PDF na pasta atual e na pasta do script."""
+def encontrar_txts():
+    """Retorna a lista de arquivos TXT na pasta atual e na pasta do script."""
     encontrados = []
     for pasta in [BASE_DIR, SCRIPT_DIR]:
         if not os.path.isdir(pasta):
             continue
         for nome in sorted(os.listdir(pasta)):
-            if nome.lower().endswith(".pdf"):
+            if nome.lower().endswith(".txt"):
                 caminho = os.path.join(pasta, nome)
                 if os.path.isfile(caminho) and caminho not in encontrados:
                     encontrados.append(caminho)
     return encontrados
 
 
-def extrair_texto_pagina(pdf_file, page_number):
-    """Abre o PDF e extrai o texto da página informada."""
-    caminho = localizar_pdf(pdf_file)
+def extrair_texto_arquivo(txt_file):
+    """Lê o arquivo de texto e retorna seu conteúdo."""
+    caminho = localizar_txt(txt_file)
     if caminho is None:
-        raise FileNotFoundError(f"Arquivo PDF não encontrado: {pdf_file}")
+        raise FileNotFoundError(f"Arquivo TXT não encontrado: {txt_file}")
 
-    with pdfplumber.open(caminho) as pdf:
-        if page_number < 1 or page_number > len(pdf.pages):
-            raise ValueError(f"Página inválida. O PDF tem {len(pdf.pages)} páginas.")
-        texto = pdf.pages[page_number - 1].extract_text() or ""
-    return texto
+    for encoding in ("utf-8", "latin-1", "cp1252"):
+        try:
+            with open(caminho, "r", encoding=encoding) as f:
+                return f.read()
+        except UnicodeDecodeError:
+            continue
+
+    raise UnicodeDecodeError(
+        "Não foi possível ler o arquivo TXT com codificações comuns (utf-8, latin-1, cp1252)."
+    )
 
 
 def extrair_data_e_cidade(texto):
-    """Extrai a data de regresso, hora e cidade do bloco do PDF."""
-    bloco = re.search(PDF_PATTERN, texto, re.DOTALL)
-    trecho = bloco.group(0) if bloco else texto
+    """Extrai a data de regresso, hora e cidade do texto completo."""
+    trecho = texto
 
-    # Data no formato típico do PDF: 221200MAI026 ou 221200MAI26
     data_match = re.search(
         r"Regressou em\s*([0-9]{2})([0-9]{4})?([A-ZÁÉÍÓÚÂÊÔÃÕÇ]{3,4})([0-9]{2,4})",
         trecho,
@@ -138,14 +136,12 @@ def extrair_data_e_cidade(texto):
 
 
 def extrair_nomes(texto):
-    """Localiza o trecho entre 4) e 5) e extrai Posto + Nome com regex."""
-    bloco = re.search(PDF_PATTERN, texto, re.DOTALL)
-    if not bloco:
-        return None
+    """Extrai Posto + Nome do texto completo."""
+    trecho = texto
 
     regex_postos = "|".join(re.escape(p) for p in POSTOS)
-    padrao_nomes = rf"({regex_postos})\s+([A-ZÁÉÍÓÚÂÊÔÃÕÇ ]+)"
-    resultados = re.findall(padrao_nomes, bloco.group(0))
+    padrao_nomes = rf"({regex_postos})\s+([A-Za-zÁÉÍÓÚÂÊÔÃÕÇáéíóúâêôãõç ]+)"
+    resultados = re.findall(padrao_nomes, trecho, re.IGNORECASE)
 
     if not resultados:
         return None
@@ -155,7 +151,7 @@ def extrair_nomes(texto):
     for posto, nome in resultados:
         nome_limpo = re.sub(r"\s+", " ", nome).strip()
         linha = {
-            "Posto": posto,
+            "Posto": posto.strip(),
             "Nome": nome_limpo,
         }
         if data_regresso:
@@ -189,32 +185,26 @@ def salvar_excel(dados, nome_arquivo):
 # =========================
 
 def gerar_excel():
-    """Lê o PDF e gera o arquivo Excel quando o botão for clicado."""
-    pdf_selecionado = pdf_var.get()
-    pagina_texto = pagina_var.get().strip()
+    """Lê o TXT e gera o arquivo Excel quando o botão for clicado."""
+    txt_selecionado = txt_var.get()
 
-    if not pdf_selecionado:
-        messagebox.showwarning("Aviso", "Nenhum arquivo PDF encontrado na pasta.")
+    if not txt_selecionado:
+        messagebox.showwarning("Aviso", "Nenhum arquivo TXT encontrado na pasta.")
         return
 
-    if not pagina_texto.isdigit():
-        messagebox.showerror("Erro", "Digite um número de página válido.")
-        return
-
-    pagina_num = int(pagina_texto)
-    caminho_pdf = pdf_map.get(pdf_selecionado, pdf_selecionado)
+    caminho_txt = txt_map.get(txt_selecionado, txt_selecionado)
 
     try:
-        texto = extrair_texto_pagina(caminho_pdf, pagina_num)
+        texto = extrair_texto_arquivo(caminho_txt)
         dados = extrair_nomes(texto)
 
         if dados is None:
             linhas = [linha.strip() for linha in texto.splitlines() if linha.strip()]
             if not linhas:
-                raise ValueError("Não foi possível extrair texto dessa página.")
+                raise ValueError("Não foi possível extrair texto do arquivo TXT.")
             dados = [{"Texto": linha} for linha in linhas]
 
-        nome_saida = f"resultado_{os.path.splitext(pdf_selecionado)[0]}_p{pagina_num}.xlsx"
+        nome_saida = f"resultado_{os.path.splitext(txt_selecionado)[0]}.xlsx"
         caminho_saida = salvar_excel(dados, nome_saida)
         messagebox.showinfo("Sucesso", f"Arquivo gerado:\n{caminho_saida}")
     except Exception as error:
@@ -222,71 +212,36 @@ def gerar_excel():
 
 
 def criar_gui():
-    """Cria a interface gráfica para escolher o PDF e a página."""
-    global pdf_var, pdf_map
-    pdfs = encontrar_pdfs()
-    pdf_map = {os.path.basename(caminho): caminho for caminho in pdfs}
+    """Cria a interface gráfica para escolher o TXT."""
+    global txt_var, txt_map
+    txts = encontrar_txts()
+    txt_map = {os.path.basename(caminho): caminho for caminho in txts}
 
     root = tk.Tk()
-    root.title("PDF para Excel")
+    root.title("TXT para Excel")
     root.resizable(False, False)
 
     frame = tk.Frame(root, padx=16, pady=16)
     frame.pack()
 
-    tk.Label(frame, text="Escolha o PDF:").grid(row=0, column=0, sticky="w")
-    if pdfs:
-        primeiro_pdf = os.path.basename(pdfs[0])
-        pdf_var = tk.StringVar(value=primeiro_pdf)
-        pdf_menu = tk.OptionMenu(frame, pdf_var, *pdf_map.keys())
-        pdf_menu.config(width=40)
-        pdf_menu.grid(row=0, column=1, pady=4)
+    tk.Label(frame, text="Escolha o TXT:").grid(row=0, column=0, sticky="w")
+    if txts:
+        primeiro_txt = os.path.basename(txts[0])
+        txt_var = tk.StringVar(value=primeiro_txt)
+        txt_menu = tk.OptionMenu(frame, txt_var, *txt_map.keys())
+        txt_menu.config(width=40)
+        txt_menu.grid(row=0, column=1, pady=4)
     else:
-        pdf_var = tk.StringVar(value="")
-        tk.Label(frame, text="(Nenhum PDF disponível)", fg="gray").grid(row=0, column=1, pady=4, sticky="w")
+        txt_var = tk.StringVar(value="")
+        tk.Label(frame, text="(Nenhum TXT disponível)", fg="gray").grid(row=0, column=1, pady=4, sticky="w")
 
-    tk.Label(frame, text="Página:").grid(row=1, column=0, sticky="w")
-    global pagina_var
-    pagina_var = tk.StringVar(value="1")
-    tk.Entry(frame, textvariable=pagina_var, width=10).grid(row=1, column=1, sticky="w", pady=4)
+    tk.Button(frame, text="Gerar Excel", command=gerar_excel, width=18).grid(row=1, column=0, columnspan=2, pady=12)
 
-    tk.Button(frame, text="Gerar Excel", command=gerar_excel, width=18).grid(row=2, column=0, columnspan=2, pady=12)
-
-    if not pdfs:
-        tk.Label(frame, text="Nenhum arquivo PDF encontrado nesta pasta.", fg="red").grid(row=3, column=0, columnspan=2)
+    if not txts:
+        tk.Label(frame, text="Nenhum arquivo TXT encontrado nesta pasta.", fg="red").grid(row=2, column=0, columnspan=2)
 
     root.mainloop()
 
 
-# =========================
-# 4. MODO LINHA DE COMANDO
-# =========================
-
-def executar_cli(pdf_file, page_number):
-    """Executa a extração diretamente a partir da linha de comando."""
-    texto = extrair_texto_pagina(pdf_file, page_number)
-    dados = extrair_nomes(texto)
-
-    if dados is None:
-        linhas = [linha.strip() for linha in texto.splitlines() if linha.strip()]
-        if not linhas:
-            raise ValueError("Não foi possível extrair texto dessa página.")
-        dados = [{"Texto": linha} for linha in linhas]
-
-    nome_saida = f"resultado_{os.path.splitext(pdf_file)[0]}_p{page_number}.xlsx"
-    caminho_saida = salvar_excel(dados, nome_saida)
-    print(f"Arquivo gerado: {caminho_saida}")
-
-
-# =========================
-# 5. ENTRADA PRINCIPAL
-# =========================
-
 if __name__ == "__main__":
-    if len(sys.argv) >= 3:
-        # Exemplo: python pdf_para_excel.py arquivo.pdf 4
-        arquivo_pdf = sys.argv[1]
-        pagina = int(sys.argv[2])
-        executar_cli(arquivo_pdf, pagina)
-    else:
-        criar_gui()
+    criar_gui()
